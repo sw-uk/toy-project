@@ -23,6 +23,8 @@ export async function buildEvent(id: string, now: number): Promise<EventDetail> 
   const winner = markets.find((m) => m.result === "yes");
   const resolved = winner !== undefined || markets.every((m) => m.result);
   const closes = markets.map((m) => Date.parse(m.close_time ?? "")).filter(Number.isFinite);
+  // 마감 시각이 하나도 없으면 화면에 쓸 기준 시각이 없으므로 없는 이벤트로 다룬다.
+  if (closes.length === 0) throw new Error(`Kalshi 404 event ${id} has no close time`);
   const announcementAt = Math.min(...closes);
 
   const endMs = resolved ? announcementAt : now;

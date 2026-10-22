@@ -5,8 +5,6 @@ import { loadSnapshot, type Loaded } from "./load";
 import { createDefaultStore, type SnapshotStore } from "./store";
 import type { EventDetail, HomeData, RatesHistory, RatesLive } from "./types";
 
-const DAY = 86_400_000;
-
 const globalForStore = globalThis as unknown as { presignalStore?: SnapshotStore };
 function store(): SnapshotStore {
   globalForStore.presignalStore ??= createDefaultStore();
@@ -60,5 +58,3 @@ export async function refreshScope(scope: string, now = Date.now()) {
   if (scope.startsWith("event:")) return (await getEvent(scope.slice(6), now, true)).fetchedAt;
   throw new Error(`unknown scope ${scope}`);
 }
-
-export const DAY_MS = DAY;
