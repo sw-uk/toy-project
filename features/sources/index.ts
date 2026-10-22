@@ -14,3 +14,4 @@ export {
   type KalshiMarket,
 } from "./kalshi";
 export { fetchEffr, parseEffr, type EffrPoint } from "./nyfed";
+export { checkReachability, type Reachability } from "./reachability";
