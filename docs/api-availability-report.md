@@ -230,3 +230,21 @@ event OrderFilled(
 - `/historical/markets?series_ticker=KXFEDDECISION`(2026-08-22 이전)와 `/markets?status=settled`(이후)를 합쳐 연준 금리 결정 28회(2023~2026)의 결과와 일봉 캔들을 얻을 수 있다.
 - 스키마 차이: 과거(historical) 캔들은 `price.close`, 현행 캔들은 `price.close_dollars`로 필드명이 다르다.
 - 회의 하루 전 확률 기준으로 실제 결과가 된 선택지의 확률은 27회 중 최저 0.59(2024-09 회의의 26bp 이상 인하, `FEDDECISION-24SEP` C26), 중앙값 0.98이었다. 회의 1건(`FEDDECISION-24JAN`)은 전날 캔들이 없어 제외했다. 0.5 미만은 0회다. 즉 "하루 전 확률 기준 의외의 결과"는 연준 금리 시장에서는 거의 발생하지 않는다.
+
+## 9. 배포 환경에서 다시 확인 (2026-10-22)
+
+Vercel 미리보기 배포의 `/api/sources` 결과(함수 지역 `iad1`, 미국 동부):
+
+| 출처 | 결과 |
+|---|---|
+| Kalshi | 200 |
+| 뉴욕 연준 | 200 |
+| Polymarket Gamma | 200 |
+| Polymarket Data API | 200 |
+| Polymarket CLOB | 200 |
+| Polygon RPC (`1rpc.io/matic`) | 403 |
+
+- 개발 PC(한국)에서 막혔던 Polymarket 공식 API가 배포 환경에서는 모두 열린다. 시장 제목(Gamma)과 지갑 단위 체결(Data API)을 공식 API로 받을 수 있다.
+- 반대로 공개 Polygon RPC는 배포 환경에서 막혔다. 온체인 로그 경로는 쓰지 않는다.
+- 응답 필드 이름과 단위(`proxy_wallet`, 타임스탬프 등)는 이 개발 PC에서는 여전히 확인할 수 없다. 배포 환경에서 실제 응답을 받아 확인해야 한다.
+
