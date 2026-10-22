@@ -1,0 +1,1047 @@
+<!--
+  prototype shell: the review chrome every prototype starts from.
+
+  Keep this comment in the prototype you grow from here: it is the contract,
+  and later turns work from that file rather than from this one.
+
+  Contract (extend product screens; keep the review shell):
+  - Product:  .sh-stage contains only end-user product UI. Keep review notes,
+               rationale, instructions, and approval controls in conversation.
+  - Screens:  <section data-screen="slug" data-title="Label"> inside .sh-stage.
+               The selector, arrow keys, and #hash routing build themselves.
+               Use one option per product destination or distinct surface,
+               named by its product role. Keep baselines, variants, comparison
+               labels, steps, indexes, and progress out of names and states.
+               Links may use href="#slug".
+  - States:   "Default" is automatic. A screen declares only representative
+               presets in data-states="Empty,Error". Use natural, screen-specific
+               names. Reserve presets for important multi-step results, forced
+               data or errors, or materially different structure; keep one-click
+               and transient states as interactions. Use data-when="Empty" on
+               preset-only elements. Call prototypeShell.setState("Name") on
+               entry and setState("Default") on exit, including when repeated
+               actions cross a preset condition.
+  - Viewport: "vp (m)" cycles full / 390 / 768. The 390 preset is a
+               fixed-height, internally scrolling phone frame. Start a
+               mobile-first prototype by adding class="sh-vp-390" to <body>
+               (or a bootstrap classList.add before the chrome script runs).
+  - Pinning:  keep in-frame bars (tab bars, CTAs) inside the phone with
+               position: sticky; position: fixed pins to the browser window.
+  - Tokens:   replace the project-tokens block with project tokens copied
+               verbatim. Map differing names to --background, --foreground, and
+               --font afterwards; replace network fonts with a system stack and
+               note that substitution. Without a design system, keep this
+               palette as the finished style. When the project ships dark
+               tokens, copy them under .sh-theme-dark, which the shell sets
+               on both the root element and body, so :root.sh-theme-dark and
+               body.sh-theme-dark work too. A .dark class or a
+               prefers-color-scheme media query copied verbatim would follow
+               the reviewer's system instead of the toggle.
+  - Theme:    the light / dark switch (t) changes the product surface only.
+               It appears only when a .sh-theme-dark rule declares dark tokens,
+               so a prototype without them carries no theme control. Prototypes
+               always load light; the review bar keeps its own dark styling in
+               both themes so it still reads as chrome.
+  - Placeholders: .wf-pic stands in for pictures the prototype has no real
+               files for. Use real text everywhere text belongs.
+
+  - Chrome:   Keep exactly the screen selector, selected-screen state selector,
+               viewport cycle, and theme toggle.
+
+  Self-contained by design: no build, no framework, no network.
+
+  PreSignal notes: tokens are the project's shadcn (nova, neutral) tokens copied
+  verbatim from app/globals.css; the dark set sits under .sh-theme-dark.
+  Font substitution: the project uses Inter via next/font; this file uses a
+  system stack. All figures, events and wallet addresses are dummy data.
+-->
+<meta charset="utf-8">
+<title>PreSignal prototype</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  /* ── project tokens (app/globals.css, copied verbatim) ── */
+  :root {
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.145 0 0);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.145 0 0);
+    --primary: oklch(0.205 0 0);
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.97 0 0);
+    --secondary-foreground: oklch(0.205 0 0);
+    --muted: oklch(0.97 0 0);
+    --muted-foreground: oklch(0.556 0 0);
+    --accent: oklch(0.97 0 0);
+    --accent-foreground: oklch(0.205 0 0);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.922 0 0);
+    --input: oklch(0.922 0 0);
+    --ring: oklch(0.708 0 0);
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --radius: 0.625rem;
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.145 0 0);
+    --font: system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  }
+  .sh-theme-dark {
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.205 0 0);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.205 0 0);
+    --popover-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.922 0 0);
+    --primary-foreground: oklch(0.205 0 0);
+    --secondary: oklch(0.269 0 0);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --accent: oklch(0.269 0 0);
+    --accent-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.556 0 0);
+  }
+
+  /* ── review chrome (sh-*): keep; extend product styles elsewhere ── */
+  * { box-sizing: border-box }
+  body {
+    margin: 0; padding: 0 0 40px;
+    background: var(--background, #f6f6f6); color: var(--foreground, #3a3a3a);
+    font-family: var(--font, system-ui, sans-serif);
+  }
+  .sh-bar {
+    position: sticky; top: 0; z-index: 999;
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    padding: 8px 12px; background: #191a1c; color: #d7d7d7;
+    font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .sh-bar b, .sh-control-label { color: #8a8f98; font-weight: 500 }
+  .sh-control { display: inline-flex; gap: 5px; align-items: center }
+  .sh-bar button {
+    border: 1px solid #3a3d42; background: none; color: inherit;
+    font: inherit; padding: 2px 9px; border-radius: 99px; cursor: pointer;
+  }
+  .sh-bar select {
+    width: 170px; border: 1px solid #3a3d42; background: #232428; color: inherit;
+    font: inherit; padding: 3px 28px 3px 9px; border-radius: 7px; cursor: pointer;
+    color-scheme: dark;
+  }
+  #sh-screen { width: 190px }
+  .sh-bar button.on { background: #d7d7d7; color: #191a1c; border-color: #d7d7d7 }
+  .sh-theme { display: inline-flex; border: 1px solid #3a3d42; border-radius: 99px; overflow: hidden }
+  .sh-theme button { border: 0; border-radius: 0; padding: 2px 10px }
+  .sh-spacer { flex: 1 }
+  .sh-stage { max-width: 960px; margin: 0 auto; padding: 12px 16px 0 }
+  [hidden] { display: none !important }
+
+  /* viewport presets */
+  .sh-vp-390 .sh-stage {
+    max-width: 390px; background: var(--background, #f6f6f6);
+    border: 10px solid #191a1c; border-radius: 28px;
+    padding: 16px 12px; height: min(844px, calc(100dvh - 52px));
+    overflow-y: auto; margin-top: 12px;
+  }
+  .sh-vp-768 .sh-stage {
+    max-width: 768px; border: 1px solid #c4c4c4; border-radius: 12px;
+    padding: 16px; margin-top: 12px;
+  }
+
+  /* placeholders */
+  .wf-pic  { border-radius: 4px; background:
+             repeating-linear-gradient(45deg, #e9e9e9, #e9e9e9 6px, #f2f2f2 6px, #f2f2f2 12px) }
+  .sh-theme-dark .wf-pic { background: repeating-linear-gradient(45deg,
+             color-mix(in srgb, var(--foreground) 16%, transparent) 0 6px,
+             color-mix(in srgb, var(--foreground) 8%, transparent) 6px 12px) }
+
+  /* ── PreSignal product styles (tokens only) ── */
+  .stage-inner { display: flex; flex-direction: column; gap: 16px }
+  .muted { color: var(--muted-foreground) }
+  .small { font-size: 12px; line-height: 1.5 }
+  h1, h2, h3, p { margin: 0 }
+  h1 { font-size: 26px; line-height: 1.2; letter-spacing: -0.02em }
+  h2 { font-size: 18px; line-height: 1.3; letter-spacing: -0.01em }
+  h3 { font-size: 15px; line-height: 1.4 }
+  a { color: inherit }
+
+  .topbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap }
+  .brand { font-weight: 700; font-size: 18px; letter-spacing: -0.02em; text-decoration: none; display: inline-flex; align-items: center; gap: 8px }
+  .brand i { width: 10px; height: 10px; border-radius: 99px; background: var(--primary); box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 18%, transparent) }
+  .nav { display: inline-flex; gap: 2px; padding: 3px; border-radius: calc(var(--radius) * 0.9); background: var(--muted) }
+  .nav a { padding: 6px 12px; border-radius: calc(var(--radius) * 0.7); font-size: 14px; text-decoration: none; color: var(--muted-foreground) }
+  .nav a[aria-current="page"] { background: var(--background); color: var(--foreground); box-shadow: 0 0 0 1px var(--border) }
+  .spacer { flex: 1 }
+  .field-select { font: inherit; font-size: 14px; color: var(--foreground); background: var(--background); border: 1px solid var(--input); border-radius: calc(var(--radius) * 0.8); padding: 6px 28px 6px 10px }
+  .btn { font: inherit; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: calc(var(--radius) * 0.8); border: 1px solid var(--input); background: var(--background); color: var(--foreground); cursor: pointer }
+  .btn:hover { background: var(--accent) }
+  .btn.primary { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary) }
+  .btn.ghost { border-color: transparent }
+  .btn[disabled] { opacity: .6; cursor: progress }
+  .spin { width: 12px; height: 12px; border-radius: 99px; border: 2px solid currentColor; border-right-color: transparent; animation: sp .7s linear infinite }
+  @keyframes sp { to { transform: rotate(360deg) } }
+
+  .alert { display: flex; gap: 10px; padding: 12px 14px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--muted); font-size: 13px; line-height: 1.55 }
+  .alert .ic { flex: none; width: 18px; height: 18px; border-radius: 99px; border: 1.5px solid currentColor; display: grid; place-items: center; font-size: 11px; font-weight: 700; margin-top: 1px }
+  .alert b { font-weight: 600 }
+  .alert.notice { background: var(--background); border-color: var(--foreground) }
+  .alert.warn { border-color: var(--destructive); background: color-mix(in srgb, var(--destructive) 6%, var(--background)) }
+  .alert ul { margin: 6px 0 0; padding-left: 18px }
+
+  .fresh { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--muted-foreground) }
+  .dot { width: 8px; height: 8px; border-radius: 99px; background: var(--primary) }
+
+  .card { background: var(--card); color: var(--card-foreground); border: 1px solid var(--border); border-radius: calc(var(--radius) * 1.4); padding: 16px; display: flex; flex-direction: column; gap: 12px }
+  .card.surprise { border-color: var(--destructive); box-shadow: inset 4px 0 0 var(--destructive) }
+  .card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap }
+  .badge { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; line-height: 1; padding: 4px 8px; border-radius: 99px; border: 1px solid var(--border); background: var(--secondary); color: var(--secondary-foreground); white-space: nowrap }
+  .badge.out { background: transparent }
+  .badge.hot { border-color: var(--destructive); color: var(--destructive); background: transparent }
+  .badge.solid { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary) }
+
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) }
+  .grid.two { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)) }
+  .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap }
+  .between { justify-content: space-between }
+
+  .big { font-size: 40px; line-height: 1; font-weight: 650; letter-spacing: -0.03em; font-variant-numeric: tabular-nums }
+  .num { font-variant-numeric: tabular-nums }
+  .bar { height: 8px; border-radius: 99px; background: var(--muted); overflow: hidden }
+  .bar > i { display: block; height: 100%; background: var(--primary); border-radius: 99px }
+  .bar.thin { height: 6px }
+  .bar.alt > i { background: var(--chart-2) }
+  .bar.soft > i { background: var(--chart-1) }
+  .odds { display: grid; gap: 8px }
+  .odds .o { display: grid; grid-template-columns: 56px 1fr 40px; gap: 10px; align-items: center; font-size: 13px }
+  .odds .o span:last-child { text-align: right }
+
+  .seg { display: inline-flex; padding: 3px; border-radius: calc(var(--radius) * 0.9); background: var(--muted); gap: 2px; flex-wrap: wrap }
+  .seg button { font: inherit; font-size: 13px; padding: 6px 12px; border: 0; background: none; border-radius: calc(var(--radius) * 0.7); color: var(--muted-foreground); cursor: pointer }
+  .seg button[aria-selected="true"] { background: var(--background); color: var(--foreground); box-shadow: 0 0 0 1px var(--border) }
+
+  .signal { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px }
+  .chip { display: inline-block; font-size: 12px; padding: 3px 8px; border-radius: 6px; border: 1px dashed var(--muted-foreground); color: var(--muted-foreground) }
+
+  .tbl-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius) }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 560px }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle }
+  th { font-weight: 500; color: var(--muted-foreground); background: var(--muted); font-size: 12px }
+  tr:last-child td { border-bottom: 0 }
+  td.r, th.r { text-align: right }
+  tr.flag td { background: color-mix(in srgb, var(--destructive) 5%, var(--background)) }
+  tr.sub td { background: var(--muted) }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px }
+  .pos { font-weight: 600 }
+  .neg { color: var(--muted-foreground) }
+
+  .stat { display: flex; flex-direction: column; gap: 4px }
+  .stat .v { font-size: 22px; font-weight: 650; letter-spacing: -0.02em }
+  .stats { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) }
+
+  .collapse-btn { font: inherit; font-size: 13px; padding: 0; border: 0; background: none; color: var(--foreground); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px }
+  .collapse-body { padding-top: 4px }
+  .sk { border-radius: 8px; background: linear-gradient(90deg, var(--muted), color-mix(in srgb, var(--muted) 50%, var(--background)), var(--muted)); background-size: 200% 100%; animation: sh 1.2s infinite }
+  @keyframes sh { to { background-position: -200% 0 } }
+  .empty { border: 1px dashed var(--border); border-radius: var(--radius); padding: 24px; text-align: center; display: flex; flex-direction: column; gap: 6px; align-items: center }
+  svg text { fill: var(--muted-foreground); font-size: 10px; font-family: var(--font) }
+  .chart { width: 100%; height: auto; display: block }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted-foreground) }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 99px; margin-right: 6px; vertical-align: -1px }
+  footer.foot { border-top: 1px solid var(--border); padding-top: 12px; font-size: 12px; color: var(--muted-foreground); display: grid; gap: 4px }
+  .crumb { font-size: 13px; text-decoration: none; color: var(--muted-foreground) }
+  .sh-vp-390 .big { font-size: 34px }
+  .sh-vp-390 h1 { font-size: 22px }
+</style>
+
+<header class="sh-bar">
+  <b>proto</b>
+  <label class="sh-control"><span class="sh-control-label">screen</span><select id="sh-screen"></select></label>
+  <span class="sh-spacer"></span>
+  <label class="sh-control"><span class="sh-control-label">state</span><select id="sh-state"></select></label>
+  <button id="sh-vp">vp: full (m)</button>
+  <div class="sh-theme" id="sh-theme" role="group" aria-label="theme (t)" hidden>
+    <button data-theme="light">light</button><button data-theme="dark">dark</button>
+  </div>
+</header>
+
+<main class="sh-stage">
+ <div class="stage-inner">
+
+  <!-- global product header -->
+  <div class="topbar" data-component="Header">
+    <a class="brand" href="#home"><i></i>PreSignal</a>
+    <nav class="nav" data-component="Tabs" aria-label="main">
+      <a href="#home" data-nav="home" data-i18n="nav_home">Home</a>
+      <a href="#rates" data-nav="rates" data-i18n="nav_rates">Interest rates</a>
+    </nav>
+    <span class="spacer"></span>
+    <span class="badge out" data-component="Badge" data-i18n="sample">Sample data</span>
+    <select class="field-select" id="lang" data-component="Select" aria-label="Language">
+      <option value="en">English (US)</option>
+      <option value="ko">한국어</option>
+      <option value="gb">English (UK)</option>
+    </select>
+  </div>
+
+  <!-- always-visible notice: the first UX principle -->
+  <div class="alert notice" data-component="Alert" role="note">
+    <span class="ic">i</span>
+    <div data-i18n-html="disc_text"></div>
+  </div>
+
+  <div class="fresh" data-component="Freshness">
+    <span class="row" style="gap:8px;flex-wrap:nowrap"><span class="dot" style="flex:none"></span><span id="fresh-text"></span></span>
+    <button class="btn" id="refresh" data-component="Button"><span id="refresh-icon" hidden class="spin"></span><span id="refresh-label">Refresh now</span></button>
+    <span class="small" id="refresh-note" hidden data-i18n="refresh_limit_note"></span>
+  </div>
+
+  <!-- ================= HOME ================= -->
+  <section data-screen="home" data-title="Home" data-states="Refreshing,Source unavailable">
+    <div class="stage-inner">
+      <div>
+        <h1 data-i18n="home_h1">What the markets are signaling</h1>
+        <p class="muted" style="margin-top:6px" data-i18n="home_sub">Probabilities from prediction markets, with the largest recent bets. No sign-in needed.</p>
+      </div>
+
+      <div class="alert warn" data-component="Alert" data-when="Source unavailable">
+        <span class="ic">!</span>
+        <div><b data-i18n="su_title">Some data could not be loaded</b><br><span data-i18n="su_text">Polymarket did not respond, so only Kalshi events are shown. Last successful update: 6 hours ago.</span></div>
+      </div>
+
+      <div class="row between">
+        <div class="seg" role="tablist" data-component="Tabs" id="seg-home">
+          <button role="tab" aria-selected="true" data-seg="up" data-i18n="seg_up">Upcoming</button>
+          <button role="tab" aria-selected="false" data-seg="res" data-i18n="seg_res">Resolved</button>
+        </div>
+      </div>
+
+      <!-- Refreshing preset -->
+      <div class="grid" data-when="Refreshing" aria-busy="true">
+        <div class="card" data-component="Skeleton"><div class="sk" style="height:14px;width:40%"></div><div class="sk" style="height:18px"></div><div class="sk" style="height:40px;width:35%"></div><div class="sk" style="height:8px"></div></div>
+        <div class="card" data-component="Skeleton"><div class="sk" style="height:14px;width:40%"></div><div class="sk" style="height:18px"></div><div class="sk" style="height:40px;width:35%"></div><div class="sk" style="height:8px"></div></div>
+        <div class="card" data-component="Skeleton"><div class="sk" style="height:14px;width:40%"></div><div class="sk" style="height:18px"></div><div class="sk" style="height:40px;width:35%"></div><div class="sk" style="height:8px"></div></div>
+      </div>
+
+      <!-- Upcoming -->
+      <div class="grid" id="list-up" data-when="Default,Source unavailable">
+        <article class="card" data-component="Card">
+          <div class="card-head"><span class="badge" data-component="Badge" data-i18n="b_rates">Rates</span><span class="muted small">Kalshi · <time data-d="2026-10-28" data-f="md"></time></span></div>
+          <h3 data-i18n="c1_t">Will the Fed raise rates at its next meeting?</h3>
+          <div class="row" style="align-items:flex-end;gap:10px"><span class="big num">12%</span><span class="muted small" style="padding-bottom:4px" data-i18n="rise_word">chance of a rise</span></div>
+          <div class="bar" data-component="Progress"><i style="width:12%"></i></div>
+          <a class="btn primary" href="#rates" data-component="Button" data-i18n="cta_rates" style="align-self:flex-start">See rates →</a>
+        </article>
+
+        <article class="card" data-component="Card" data-when="Default">
+          <div class="card-head"><span class="badge" data-component="Badge" data-i18n="b_politics">Politics</span><span class="badge hot" data-component="Badge" data-i18n="notable_2">2 notable bets</span><span class="muted small">Polymarket · <time data-d="2026-11-14" data-f="md"></time></span></div>
+          <h3 data-i18n="c2_t">Will the summit end without a signed trade framework?</h3>
+          <div class="row" style="align-items:flex-end;gap:10px"><span class="big num">21%</span><span class="muted small" style="padding-bottom:4px" data-i18n="yes_word">chance of Yes</span></div>
+          <div class="bar" data-component="Progress"><i style="width:21%"></i></div>
+          <a class="btn primary" href="#event" data-component="Button" data-i18n="cta_event" style="align-self:flex-start">See large bets →</a>
+        </article>
+
+        <article class="card" data-component="Card" data-when="Default">
+          <div class="card-head"><span class="badge" data-component="Badge" data-i18n="b_business">Business</span><span class="muted small">Polymarket · <time data-d="2026-12-31" data-f="md"></time></span></div>
+          <h3 data-i18n="c3_t">Will Company A and Company B announce a merger by year end?</h3>
+          <div class="row" style="align-items:flex-end;gap:10px"><span class="big num">27%</span><span class="muted small" style="padding-bottom:4px" data-i18n="yes_word">chance of Yes</span></div>
+          <div class="bar" data-component="Progress"><i style="width:27%"></i></div>
+          <span class="muted small" data-i18n="no_notable">No notable bets</span>
+        </article>
+
+        <article class="card" data-component="Card">
+          <div class="card-head"><span class="badge" data-component="Badge" data-i18n="b_econ">Economy</span><span class="muted small">Kalshi · <time data-d="2026-11-30" data-f="md"></time></span></div>
+          <h3 data-i18n="c4_t">Will crude oil close above $90 on the last trading day of November?</h3>
+          <div class="row" style="align-items:flex-end;gap:10px"><span class="big num">41%</span><span class="muted small" style="padding-bottom:4px" data-i18n="yes_word">chance of Yes</span></div>
+          <div class="bar" data-component="Progress"><i style="width:41%"></i></div>
+          <span class="muted small" data-i18n="no_notable">No notable bets</span>
+        </article>
+      </div>
+
+      <!-- Resolved -->
+      <div class="grid" id="list-res" hidden>
+        <article class="card surprise" data-component="Card">
+          <div class="card-head"><span class="badge hot" data-component="Badge" data-i18n="surprise">Surprise</span><span class="badge" data-i18n="b_rates">Rates</span><span class="muted small">Kalshi · <time data-d="2026-09-16" data-f="md"></time></span></div>
+          <h3 data-i18n="r1_t">Did the Fed raise rates on its September meeting?</h3>
+          <div class="row"><span class="badge solid" data-i18n="r1_res">Result: Yes (+0.25)</span></div>
+          <p class="small" data-i18n="r1_note">Happened despite only 23% odds a month earlier.</p>
+          <div class="bar thin" title="7%"><i style="width:7%"></i></div>
+        </article>
+        <article class="card" data-component="Card">
+          <div class="card-head"><span class="badge" data-component="Badge" data-i18n="b_politics">Politics</span><span class="muted small">Polymarket · <time data-d="2026-10-09" data-f="md"></time></span></div>
+          <h3 data-i18n="r2_t">Did the October talks end without an agreement?</h3>
+          <div class="row"><span class="badge solid" data-i18n="res_yes">Result: Yes</span></div>
+          <p class="small muted" data-i18n="r2_note">As expected: 61% a month earlier.</p>
+          <div class="bar thin"><i style="width:61%"></i></div>
+        </article>
+        <article class="card" data-component="Card">
+          <div class="card-head"><span class="badge" data-component="Badge" data-i18n="b_rates">Rates</span><span class="muted small">Kalshi · <time data-d="2025-12-11" data-f="md"></time></span></div>
+          <h3 data-i18n="r3_t">Did the Fed cut rates at its December 2025 meeting?</h3>
+          <div class="row"><span class="badge solid" data-i18n="res_yes">Result: Yes</span></div>
+          <p class="small muted" data-i18n="r3_note">As expected: 89% a month earlier.</p>
+          <div class="bar thin"><i style="width:89%"></i></div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= RATES ================= -->
+  <section data-screen="rates" data-title="Interest rates" data-states="Refresh failed">
+    <div class="stage-inner">
+      <div>
+        <h1 data-i18n="rates_h1">Interest rates</h1>
+        <p class="muted" style="margin-top:6px" data-i18n="last_decision" data-vars='{"date":"d:2026-09-16"}'>Last decision</p>
+      </div>
+
+      <div class="alert warn" data-component="Alert" data-when="Refresh failed">
+        <span class="ic">!</span>
+        <div><b data-i18n="rf_title">Refresh failed</b><br><span data-i18n="rf_text">Showing the last saved figures from 3 hours ago. Try again in a few minutes.</span></div>
+      </div>
+
+      <!-- next meeting -->
+      <article class="card" data-component="Card">
+        <div class="row between">
+          <div>
+            <div class="muted small" data-i18n="next_meeting">Next meeting</div>
+            <h2><time data-d="2026-10-28" data-f="full"></time> · <span class="muted" data-i18n="in6">in 6 days</span></h2>
+          </div>
+          <span class="muted small">Kalshi</span>
+        </div>
+        <div class="row" style="align-items:flex-end;gap:10px"><span class="big num">12%</span><span class="muted" style="padding-bottom:4px" data-i18n="rise_label">probability of a rate rise</span></div>
+        <div class="bar" data-component="Progress" role="img" aria-label="12%"><i style="width:12%"></i></div>
+        <div>
+          <button class="collapse-btn" data-toggle="more1" data-component="Collapsible"><span data-i18n="show_more">Show hold and cut odds</span></button>
+          <div class="collapse-body odds" id="more1" hidden>
+            <div class="o"><span data-i18n="w_hold">Hold</span><div class="bar thin alt"><i style="width:86%"></i></div><span class="num">86%</span></div>
+            <div class="o"><span data-i18n="w_cut">Cut</span><div class="bar thin alt"><i style="width:2%"></i></div><span class="num">2%</span></div>
+          </div>
+        </div>
+      </article>
+
+      <!-- how to read: first UX principle -->
+      <div class="alert notice" data-component="Alert">
+        <span class="ic">i</span>
+        <div>
+          <b data-i18n="read_title">How to read the section below</b>
+          <ul>
+            <li data-i18n="read_1">It is a calculation from market probabilities, not advice and not a recommendation.</li>
+            <li data-i18n="read_2">Markets can be wrong. See how often they have been right further down this page.</li>
+            <li data-i18n="read_3">PreSignal does not sell or recommend any product. Decisions and their consequences are yours.</li>
+          </ul>
+        </div>
+      </div>
+
+      <article class="card" data-component="Card">
+        <h2 data-i18n="intents_h">What the numbers say for your decision</h2>
+        <div class="seg" role="tablist" data-component="Tabs" id="seg-intent">
+          <button role="tab" aria-selected="true" data-int="dep" data-i18n="tab_dep">Certificate of deposit</button>
+          <button role="tab" aria-selected="false" data-int="tsy" data-i18n="tab_tsy">U.S. Treasuries</button>
+          <button role="tab" aria-selected="false" data-int="loan" data-i18n="tab_loan">Adjustable-rate loan</button>
+        </div>
+        <div id="intent-body" style="display:flex;flex-direction:column;gap:10px">
+          <div class="signal"><span class="dot"></span><span id="sig-name"></span></div>
+          <p id="sig-text"></p>
+          <div class="row"><span class="chip" data-i18n="not_advice">Calculated from market probabilities · not advice</span></div>
+          <div>
+            <button class="collapse-btn" data-toggle="calc" data-component="Collapsible"><span data-i18n="calc_btn">How this signal is calculated</span></button>
+            <p class="collapse-body muted small" id="calc" hidden data-i18n="calc_text"></p>
+          </div>
+        </div>
+      </article>
+
+      <!-- past accuracy -->
+      <article class="card" data-component="Card">
+        <h2 data-i18n="acc_h">How often have these probabilities been right?</h2>
+        <p data-i18n="acc_text">One month before a Fed meeting, outcomes rated 60% or higher happened in 22 of 26 meetings.</p>
+        <div class="odds">
+          <div class="o"><span class="num">22 / 26</span><div class="bar thin"><i style="width:84.6%"></i></div><span class="num">85%</span></div>
+        </div>
+      </article>
+
+      <div class="grid two">
+        <article class="card" data-component="Card">
+          <h3 data-i18n="chart1_h">Effective rate, last 12 months</h3>
+          <div id="chart-rate"></div>
+          <div class="legend"><span><i style="background:var(--primary)"></i><span data-i18n="lg_rate">Effective fed funds rate</span></span></div>
+        </article>
+        <article class="card" data-component="Card">
+          <h3 data-i18n="chart2_h">Rise probability one month before each meeting</h3>
+          <div id="chart-prob"></div>
+          <div class="legend"><span><i style="background:var(--destructive)"></i><span data-i18n="lg_surprise">Surprise (rose despite low odds)</span></span></div>
+        </article>
+      </div>
+
+      <article class="card" data-component="Card">
+        <h2 data-i18n="tbl_h">Meetings in the next 6 months</h2>
+        <div class="tbl-wrap" data-component="Table">
+          <table>
+            <thead><tr><th data-i18n="col_date">Date</th><th data-i18n="col_in">In</th><th data-i18n="col_rise">Rise probability</th><th></th></tr></thead>
+            <tbody id="meetings"></tbody>
+          </table>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ================= EVENT DETAIL ================= -->
+  <section data-screen="event" data-title="Event detail" data-states="Before event,Wallet data unavailable">
+    <div class="stage-inner">
+      <a class="crumb" href="#home" data-i18n="back">← Home</a>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div class="row"><span class="badge" data-i18n="b_politics">Politics</span><span class="muted small">Polymarket</span>
+          <span class="badge solid" data-when="Default,Wallet data unavailable" data-i18n="st_resolved">Resolved: Yes</span>
+          <span class="badge out" data-when="Before event" data-i18n="st_open">Open</span></div>
+        <h1 data-i18n="ev_q">Will the summit end without a signed trade framework?</h1>
+        <p class="muted" data-when="Default,Wallet data unavailable" data-i18n="ev_when" data-vars='{"date":"d:2026-11-14"}'></p>
+        <p class="muted" data-when="Before event" data-i18n="ev_open_when" data-vars='{"date":"d:2026-11-14"}'></p>
+      </div>
+
+      <div class="alert warn" data-component="Alert" data-when="Wallet data unavailable">
+        <span class="ic">!</span>
+        <div><b data-i18n="wu_title">Wallet details are unavailable right now</b><br><span data-i18n="wu_text">Showing market-level volume and price only. Wallet-level bets could not be loaded.</span></div>
+      </div>
+
+      <article class="card" data-component="Card">
+        <div class="stats">
+          <div class="stat"><span class="muted small" data-i18n="s_vol">Total volume</span><span class="v num" id="s-vol"></span></div>
+          <div class="stat" data-when="Default,Before event"><span class="muted small" data-i18n="s_big">Largest single bet</span><span class="v num" id="s-big"></span></div>
+          <div class="stat" data-when="Default,Before event"><span class="muted small" data-i18n="s_n">Bets over $25,000 within 3 hours before</span><span class="v num">2</span></div>
+          <div class="stat" data-when="Wallet data unavailable"><span class="muted small" data-i18n="s_big">Largest single bet</span><span class="v">—</span></div>
+        </div>
+      </article>
+
+      <article class="card" data-component="Card">
+        <h3 data-i18n="tl_h">Chance of Yes, last 12 hours before the announcement</h3>
+        <div id="chart-tl"></div>
+        <div class="legend"><span><i style="background:var(--primary)"></i><span data-i18n="lg_price">Market price</span></span><span data-when="Default,Before event"><i style="background:var(--destructive)"></i><span data-i18n="lg_bet">Large bet</span></span><span data-when="Default,Wallet data unavailable"><i style="background:var(--foreground);border-radius:2px;width:2px;height:10px"></i><span data-i18n="lg_ann">Announcement</span></span></div>
+      </article>
+
+      <div class="alert notice" data-component="Alert" data-when="Default,Before event">
+        <span class="ic">i</span>
+        <div><b data-i18n="obs_title">An observed pattern, not a finding</b><br><span data-i18n="obs_text">Large bets can have many explanations. PreSignal shows what the public record contains and does not say who placed a bet or why.</span></div>
+      </div>
+
+      <article class="card" data-component="Card" data-when="Default">
+        <div class="row between"><h2 data-i18n="bets_h">Large bets before the announcement</h2><span class="muted small" data-i18n="ctx">Median bet here: $210. The largest bet is 230× that.</span></div>
+        <div class="tbl-wrap" data-component="Table">
+          <table>
+            <thead><tr><th data-i18n="c_wallet">Wallet</th><th data-i18n="c_pos">Position</th><th class="r" data-i18n="c_amt">Amount</th><th class="r" data-i18n="c_price">Price paid</th><th data-i18n="c_when">Placed</th><th class="r" data-i18n="c_profit">Profit</th></tr></thead>
+            <tbody id="bets"></tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="card" data-component="Card" data-when="Before event">
+        <div class="row between"><h2 data-i18n="bets_open_h">Largest recent bets</h2><span class="muted small" data-i18n="open_note">The outcome is not known yet.</span></div>
+        <div class="tbl-wrap" data-component="Table">
+          <table>
+            <thead><tr><th data-i18n="c_wallet">Wallet</th><th data-i18n="c_pos">Position</th><th class="r" data-i18n="c_amt">Amount</th><th class="r" data-i18n="c_price">Price paid</th><th data-i18n="c_when">Placed</th><th class="r" data-i18n="c_payout">Payout if it happens</th></tr></thead>
+            <tbody id="bets-open"></tbody>
+          </table>
+        </div>
+      </article>
+
+      <div class="empty" data-component="Empty" data-when="Wallet data unavailable">
+        <h3 data-i18n="empty_t">No wallet-level bets to show</h3>
+        <p class="muted small" data-i18n="empty_x">Try again later with “Refresh now”.</p>
+      </div>
+
+      <p class="muted small" data-i18n="pseudo">Wallet addresses are pseudonymous. PreSignal does not connect addresses to real people.</p>
+    </div>
+  </section>
+
+  <footer class="foot" data-component="Footer">
+    <span data-i18n="foot_1">Sources: Kalshi, Polymarket, Federal Reserve Bank of New York. Figures in this prototype are dummy data.</span>
+    <span data-i18n="foot_2">PreSignal is for information only. It does not sell, recommend or arrange any financial product.</span>
+  </footer>
+ </div>
+</main>
+
+<script>
+  const stage = document.querySelector('.sh-stage');
+  const screens = [...stage.querySelectorAll('[data-screen]')];
+  const screenSelect = document.getElementById('sh-screen');
+  const stateSelect = document.getElementById('sh-state');
+  const vpBtn = document.getElementById('sh-vp');
+  const themeCtl = document.getElementById('sh-theme');
+  const themeBtns = [...themeCtl.querySelectorAll('button')];
+  let current = null;
+  let currentStates = [];
+
+  screens.forEach(s => {
+    const option = document.createElement('option');
+    option.textContent = s.dataset.title || s.dataset.screen;
+    option.value = s.dataset.screen;
+    screenSelect.append(option);
+  });
+  screenSelect.onchange = () => show(screenSelect.value);
+
+  function show(slug) {
+    current = screens.find(s => s.dataset.screen === slug) || screens[0];
+    screens.forEach(s => s.hidden = s !== current);
+    screenSelect.value = current.dataset.screen;
+    history.replaceState(null, '', '#' + current.dataset.screen);
+    buildStates();
+  }
+
+  function buildStates() {
+    const declared = (current.dataset.states || '').split(',').map(x => x.trim()).filter(Boolean);
+    currentStates = ['Default', ...declared.filter(name => name !== 'Default')];
+    stateSelect.innerHTML = '';
+    currentStates.forEach(name => {
+      const option = document.createElement('option');
+      option.textContent = name;
+      option.value = name;
+      stateSelect.append(option);
+    });
+    applyState('Default');
+  }
+
+  function applyState(name) {
+    const active = currentStates.includes(name) ? name : 'Default';
+    current.querySelectorAll('[data-when]').forEach(el => {
+      el.hidden = !el.dataset.when.split(',').map(x => x.trim()).includes(active);
+    });
+    stateSelect.value = active;
+    document.dispatchEvent(new CustomEvent('statechange', { detail: active }));
+  }
+  stateSelect.onchange = () => applyState(stateSelect.value);
+
+  window.prototypeShell = {
+    showScreen: show,
+    setState: applyState,
+    getScreen: () => current?.dataset.screen,
+    getState: () => stateSelect.value
+  };
+
+  const VPS = ['full', '390', '768'];
+  let vp = VPS.find(v => document.body.classList.contains('sh-vp-' + v)) || 'full';
+  function applyVp() {
+    VPS.forEach(v => document.body.classList.toggle('sh-vp-' + v, v === vp && v !== 'full'));
+    vpBtn.textContent = 'vp: ' + vp + ' (m)';
+    vpBtn.classList.toggle('on', vp !== 'full');
+  }
+  vpBtn.onclick = () => { vp = VPS[(VPS.indexOf(vp) + 1) % VPS.length]; applyVp(); };
+  applyVp();
+
+  const hasDark = [...document.styleSheets].some(sheet => {
+    try {
+      return [...sheet.cssRules].some(rule => (rule.selectorText || '')
+        .split(',').some(part => /\.sh-theme-dark$/.test(part.trim())));
+    } catch { return false }
+  });
+  let dark = false;
+  function applyTheme() {
+    document.documentElement.classList.toggle('sh-theme-dark', dark);
+    document.body.classList.toggle('sh-theme-dark', dark);
+    themeBtns.forEach(b => b.classList.toggle('on', (b.dataset.theme === 'dark') === dark));
+  }
+  themeCtl.hidden = !hasDark;
+  themeBtns.forEach(b => b.onclick = () => { dark = b.dataset.theme === 'dark'; applyTheme(); });
+  applyTheme();
+
+  addEventListener('keydown', e => {
+    if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+    const i = screens.indexOf(current);
+    if (e.key === 'ArrowRight') show(screens[(i + 1) % screens.length].dataset.screen);
+    if (e.key === 'ArrowLeft') show(screens[(i - 1 + screens.length) % screens.length].dataset.screen);
+    if (e.key === 'm') vpBtn.click();
+    if (e.key === 't' && !themeCtl.hidden) { dark = !dark; applyTheme(); }
+  });
+
+  addEventListener('hashchange', () => show(location.hash.slice(1)));
+  show(location.hash.slice(1));
+</script>
+
+<script>
+  /* ── PreSignal product behaviour (dummy data, no network) ── */
+  const LOCALE = { en: 'en-US', ko: 'ko-KR', gb: 'en-GB' };
+  const EN = {
+    nav_home: 'Home', nav_rates: 'Interest rates', sample: 'Sample data',
+    disc_text: '<b>PreSignal shows probabilities and trade records from prediction markets.</b> Every figure is calculated data. It is not investment advice, and it is not an offer to sell any product. You are solely responsible for your own investment decisions.',
+    fresh: 'Updated {ago} · auto-refresh every {every} (event in {days} days)',
+    ago: '3 hours ago', every: '12 hours', days: '6',
+    refresh_btn: 'Refresh now', refreshing_btn: 'Refreshing…', refresh_wait: 'Refresh in {s}s', refresh_locked: 'Too many refreshes. Try again in {m} min',
+    refresh_limit_note: 'Refreshing is limited to keep the data sources responsive. Automatic updates continue as scheduled.',
+    home_h1: 'What the markets are signaling',
+    home_sub: 'Probabilities from prediction markets, with the largest recent bets. No sign-in needed.',
+    su_title: 'Some data could not be loaded', su_text: 'Polymarket did not respond, so only Kalshi events are shown. Last successful update: 6 hours ago.',
+    seg_up: 'Upcoming', seg_res: 'Resolved',
+    b_rates: 'Rates', b_politics: 'Politics', b_business: 'Business', b_econ: 'Economy',
+    notable_2: '2 notable bets', no_notable: 'No notable bets',
+    c1_t: 'Will the Fed raise rates at its next meeting?',
+    c2_t: 'Will the summit end without a signed trade framework?',
+    c3_t: 'Will Company A and Company B announce a merger by Dec 31?',
+    c4_t: 'Will crude oil close above $90 on Nov 30?',
+    rise_word: 'chance of a rise', yes_word: 'chance of Yes',
+    cta_rates: 'See rates →', cta_event: 'See large bets →',
+    surprise: 'Surprise',
+    r1_t: 'Did the Fed raise rates at its September meeting?', r1_res: 'Result: Yes (+0.25)', r1_note: 'Happened despite only 7% odds a month earlier.',
+    r2_t: 'Did the October talks end without an agreement?', r2_note: 'As expected: 61% a month earlier.',
+    r3_t: 'Did the Fed cut rates at its December 2025 meeting?', r3_note: 'As expected: 89% a month earlier.',
+    res_yes: 'Result: Yes',
+    rates_h1: 'Interest rates',
+    last_decision: 'Last decision: {date} · raised by 0.25 point · effective rate 3.88%',
+    rf_title: 'Refresh failed', rf_text: 'Showing the last saved figures from 3 hours ago. Try again in a few minutes.',
+    next_meeting: 'Next meeting', in6: 'in 6 days', rise_label: 'probability of a rate rise',
+    show_more: 'Show hold and cut odds', hide_more: 'Hide hold and cut odds', w_hold: 'Hold', w_cut: 'Cut', w_rise: 'Rise',
+    read_title: 'How to read the section below',
+    read_1: 'It is a calculation from market probabilities, not advice and not a recommendation.',
+    read_2: 'Markets can be wrong. See how often they have been right further down this page.',
+    read_3: 'PreSignal does not sell or recommend any product. Decisions and their consequences are yours.',
+    intents_h: 'What the numbers say for your decision',
+    tab_dep: 'Certificate of deposit', tab_tsy: 'U.S. Treasuries', tab_loan: 'Adjustable-rate loan',
+    sig_high: 'A rise is likely', sig_none: 'No clear signal', sig_low: 'Low likelihood of a rise', sig_unusual: 'A rise would be unusual', sig_very: 'A rise would be very unusual',
+    dep_text: 'The market gives a 12% chance of a rise at the next meeting and 86% for no change. In this data, waiting does not show a clear advantage.',
+    tsy_text: 'With 12% for a rise, market pricing points to little change in short-term rates at the next meeting. The signal does not point to buying earlier or later.',
+    loan_text: 'A 12% chance of a rise means the market expects your rate to stay put at the next meeting. A later meeting is more likely to move it: December shows 76% for a rise.',
+    not_advice: 'Calculated from market probabilities · not advice',
+    calc_btn: 'How this signal is calculated',
+    calc_text: 'The signal is based on the next meeting’s rise probability. 60% or more: “A rise is likely”. 40% to 59%: “No clear signal”. Below 40%: “Low likelihood”. Below 5%: “Unusual”. Below 1%: “Very unusual”. These cut-offs are simple rules, not a forecast.',
+    acc_h: 'How often have these probabilities been right?',
+    acc_text: 'One month before a Fed meeting, outcomes rated 60% or higher happened in 22 of 26 meetings.',
+    chart1_h: 'Effective rate, last 12 months', lg_rate: 'Effective fed funds rate',
+    chart2_h: 'Rise probability one month before each meeting', lg_surprise: 'Surprise (rose despite low odds)',
+    tbl_h: 'Meetings in the next 6 months', col_date: 'Date', col_in: 'In', col_rise: 'Rise probability',
+    hold_cut: 'Hold / cut', days_word: '{n} days',
+    back: '← Home', st_resolved: 'Resolved: Yes', st_open: 'Open',
+    ev_q: 'Will the summit end without a signed trade framework?',
+    ev_when: 'Announced on {date}, 09:00 UTC', ev_open_when: 'Closes on {date}',
+    wu_title: 'Wallet details are unavailable right now', wu_text: 'Showing market-level volume and price only. Wallet-level bets could not be loaded.',
+    s_vol: 'Total volume', s_big: 'Largest single bet', s_n: 'Bets over $25,000 within 3 hours before',
+    tl_h: 'Chance of Yes, last 12 hours before the announcement', lg_price: 'Market price', lg_bet: 'Large bet', lg_ann: 'Announcement',
+    obs_title: 'An observed pattern, not a finding',
+    obs_text: 'Large bets can have many explanations. PreSignal shows what the public record contains and does not say who placed a bet or why.',
+    bets_h: 'Large bets before the announcement', ctx: 'Median bet here: $210. The largest bet is 230× that.',
+    c_wallet: 'Wallet', c_pos: 'Position', c_amt: 'Amount', c_price: 'Price paid', c_when: 'Placed', c_profit: 'Profit', c_payout: 'Payout if it happens',
+    bets_open_h: 'Largest recent bets', open_note: 'The outcome is not known yet.',
+    empty_t: 'No wallet-level bets to show', empty_x: 'Try again later with “Refresh now”.',
+    pseudo: 'Wallet addresses are pseudonymous. PreSignal does not connect addresses to real people.',
+    p_yes: 'Bought Yes', p_no: 'Bought No', before: '{h} h {m} min before', before_d: '{d} day before',
+    foot_1: 'Sources: Kalshi, Polymarket, Federal Reserve Bank of New York. Figures in this prototype are dummy data.',
+    foot_2: 'PreSignal is for information only. It does not sell, recommend or arrange any financial product.'
+  };
+  const KO = {
+    nav_home: '홈', nav_rates: '금리', sample: '샘플 데이터',
+    disc_text: '<b>PreSignal은 예측시장의 확률과 거래 기록을 보여 주는 정보 사이트입니다.</b> 모든 수치는 계산된 데이터이며 투자 권유나 금융상품 판매가 아닙니다. 모든 투자 판단과 그에 따른 책임은 이용자 본인에게 있습니다.',
+    fresh: '{ago} 갱신 · {every}마다 자동 갱신 (이벤트까지 {days}일)',
+    ago: '3시간 전', every: '12시간', days: '6',
+    refresh_btn: '지금 새로 고침', refreshing_btn: '불러오는 중…', refresh_wait: '{s}초 후 새로 고침 가능', refresh_locked: '새로 고침이 너무 잦습니다. {m}분 후 다시 시도해 주세요',
+    refresh_limit_note: '데이터 제공처가 원활하게 응답하도록 새로 고침 횟수를 제한합니다. 자동 갱신은 일정대로 계속됩니다.',
+    home_h1: '시장이 보내는 신호',
+    home_sub: '예측시장의 확률과 최근 눈에 띄는 큰 베팅을 보여 줍니다. 로그인은 필요 없습니다.',
+    su_title: '일부 데이터를 불러오지 못했습니다', su_text: 'Polymarket이 응답하지 않아 Kalshi 이벤트만 표시합니다. 마지막 성공 갱신: 6시간 전.',
+    seg_up: '진행 예정', seg_res: '결과 확정',
+    b_rates: '금리', b_politics: '정치', b_business: '기업', b_econ: '경제',
+    notable_2: '눈에 띄는 베팅 2건', no_notable: '눈에 띄는 베팅 없음',
+    c1_t: '연준이 다음 회의에서 금리를 올릴까?',
+    c2_t: '정상회담이 무역 기본합의 서명 없이 끝날까?',
+    c3_t: 'A사와 B사가 12월 31일까지 합병을 발표할까?',
+    c4_t: '11월 30일 원유가 90달러 위로 마감할까?',
+    rise_word: '인상 확률', yes_word: '예(Yes) 확률',
+    cta_rates: '금리 보기 →', cta_event: '큰 베팅 보기 →',
+    surprise: '의외의 결과',
+    r1_t: '연준이 9월 회의에서 금리를 올렸을까?', r1_res: '결과: 예 (+0.25)', r1_note: '한 달 전에는 확률이 7%에 불과했지만 일어났습니다.',
+    r2_t: '10월 협상이 합의 없이 끝났을까?', r2_note: '예상대로입니다: 한 달 전 61%.',
+    r3_t: '연준이 2025년 12월 회의에서 금리를 내렸을까?', r3_note: '예상대로입니다: 한 달 전 89%.',
+    res_yes: '결과: 예',
+    rates_h1: '금리',
+    last_decision: '마지막 결정: {date} · 0.25%p 인상 · 실효금리 3.88%',
+    rf_title: '새로 고침에 실패했습니다', rf_text: '3시간 전에 저장된 마지막 수치를 보여 줍니다. 잠시 후 다시 시도해 주세요.',
+    next_meeting: '다음 회의', in6: '6일 후', rise_label: '금리 인상 확률',
+    show_more: '동결·인하 확률 펼치기', hide_more: '동결·인하 확률 접기', w_hold: '동결', w_cut: '인하', w_rise: '인상',
+    read_title: '아래 내용을 읽는 방법',
+    read_1: '시장 확률로 계산한 값이며 조언이나 추천이 아닙니다.',
+    read_2: '시장도 틀릴 수 있습니다. 이 페이지 아래에서 과거 적중률을 확인하세요.',
+    read_3: 'PreSignal은 어떤 상품도 판매하거나 권유하지 않습니다. 판단과 그 결과는 이용자 본인의 몫입니다.',
+    intents_h: '내 결정에 대해 숫자가 말해 주는 것',
+    tab_dep: '정기예금', tab_tsy: '미국채', tab_loan: '변동금리 대출',
+    sig_high: '인상 가능성이 큼', sig_none: '뚜렷한 신호 없음', sig_low: '인상 가능성 낮음', sig_unusual: '인상은 이례적', sig_very: '인상은 매우 이례적',
+    dep_text: '시장은 다음 회의에서 인상 확률을 12%, 동결을 86%로 봅니다. 이 데이터에서는 기다리는 쪽이 뚜렷이 유리하다는 신호가 없습니다.',
+    tsy_text: '인상 확률이 12%라서 시장 가격은 다음 회의에서 단기금리가 거의 변하지 않을 것임을 가리킵니다. 더 일찍 또는 더 늦게 사라는 신호는 아닙니다.',
+    loan_text: '인상 확률 12%는 다음 회의에서 대출 금리가 그대로일 것으로 시장이 본다는 뜻입니다. 이후 회의가 더 움직일 가능성이 큽니다. 12월은 인상 확률이 76%입니다.',
+    not_advice: '시장 확률로 계산한 값 · 조언 아님',
+    calc_btn: '이 신호는 어떻게 계산하나요?',
+    calc_text: '다음 회의의 인상 확률을 기준으로 합니다. 60% 이상: “인상 가능성이 큼”. 40~59%: “뚜렷한 신호 없음”. 40% 미만: “가능성 낮음”. 5% 미만: “이례적”. 1% 미만: “매우 이례적”. 이 기준은 단순한 규칙이며 예측이 아닙니다.',
+    acc_h: '이 확률은 얼마나 맞았나요?',
+    acc_text: '연준 회의 한 달 전 60% 이상으로 평가된 결과는 26번의 회의 중 22번 일어났습니다.',
+    chart1_h: '최근 12개월 실효금리', lg_rate: '실효 연방기금금리',
+    chart2_h: '회의 한 달 전 인상 확률', lg_surprise: '의외의 결과 (낮은 확률인데 인상)',
+    tbl_h: '앞으로 6개월 회의', col_date: '날짜', col_in: '남은 기간', col_rise: '인상 확률',
+    hold_cut: '동결·인하', days_word: '{n}일',
+    back: '← 홈', st_resolved: '결과 확정: 예', st_open: '진행 중',
+    ev_q: '정상회담이 무역 기본합의 서명 없이 끝날까?',
+    ev_when: '{date} 09:00 UTC 발표', ev_open_when: '{date} 마감',
+    wu_title: '지금은 지갑 정보를 볼 수 없습니다', wu_text: '시장 단위 거래량과 가격만 보여 줍니다. 지갑 단위 베팅을 불러오지 못했습니다.',
+    s_vol: '총 거래량', s_big: '최대 단일 베팅', s_n: '발표 3시간 전 이내 2.5만 달러 초과 베팅',
+    tl_h: '발표 전 12시간 동안의 예(Yes) 확률', lg_price: '시장 가격', lg_bet: '큰 베팅', lg_ann: '발표 시점',
+    obs_title: '관찰된 패턴이며 결론이 아닙니다',
+    obs_text: '큰 베팅에는 여러 이유가 있을 수 있습니다. PreSignal은 공개 기록에 있는 내용만 보여 주며 누가 왜 베팅했는지는 말하지 않습니다.',
+    bets_h: '발표 전 큰 베팅', ctx: '이 시장의 베팅 중앙값은 210달러입니다. 최대 베팅은 그 230배입니다.',
+    c_wallet: '지갑', c_pos: '포지션', c_amt: '금액', c_price: '매수 가격', c_when: '베팅 시점', c_profit: '수익', c_payout: '발생 시 지급액',
+    bets_open_h: '최근 큰 베팅', open_note: '아직 결과가 정해지지 않았습니다.',
+    empty_t: '표시할 지갑 단위 베팅이 없습니다', empty_x: '“지금 새로 고침”으로 나중에 다시 시도해 주세요.',
+    pseudo: '지갑 주소는 익명입니다. PreSignal은 주소를 실제 사람과 연결하지 않습니다.',
+    p_yes: '예(Yes) 매수', p_no: '아니오(No) 매수', before: '{h}시간 {m}분 전', before_d: '{d}일 전',
+    foot_1: '출처: Kalshi, Polymarket, 뉴욕 연방준비은행. 이 프로토타입의 수치는 가상의 데이터입니다.',
+    foot_2: 'PreSignal은 정보 제공용입니다. 어떤 금융상품도 판매, 추천, 중개하지 않습니다.'
+  };
+  const GB = Object.assign({}, EN, {
+    home_h1: 'What the markets are signalling',
+    fresh: 'Updated {ago} · auto-refresh every {every} (event in {days} days)',
+    c3_t: 'Will Company A and Company B announce a merger by 31 December?',
+    c4_t: 'Will crude oil close above $90 on 30 November?',
+    tab_dep: 'Fixed-term deposit', tab_tsy: 'US government bonds (Treasuries)', tab_loan: 'Variable-rate loan',
+    tsy_text: 'With 12% for a rise, market pricing points to little change in short-term rates at the next meeting. The signal does not favour buying earlier or later.',
+    loan_text: 'A 12% chance of a rise means the market expects your rate to stay put at the next meeting. A later meeting is more likely to move it: December shows 76% for a rise.',
+    disc_text: '<b>PreSignal shows probabilities and trade records from prediction markets.</b> Every figure is calculated data. It is not investment advice, and it is not a financial promotion or an offer to sell any product. You alone are responsible for your investment decisions.',
+    read_3: 'PreSignal does not sell or recommend any product. Decisions, and their consequences, are yours.',
+    ctx: 'Median bet here: $210. The largest bet is 230 times that.',
+    last_decision: 'Last decision: {date} · raised by 0.25 percentage points · effective rate 3.88%',
+    tab_loan_s: 'Variable-rate loan'
+  });
+  const DICT = { en: EN, ko: KO, gb: GB };
+  let lang = 'en';
+  const t = (k, vars) => {
+    let s = (DICT[lang][k] ?? EN[k] ?? k);
+    if (vars) Object.keys(vars).forEach(n => { s = s.replace('{' + n + '}', vars[n]) });
+    return s;
+  };
+  const fmtDate = (iso, f) => {
+    const d = new Date(iso + 'T12:00:00Z');
+    const o = f === 'md' ? { month: 'short', day: 'numeric' } : f === 'full' ? { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' } : { day: 'numeric', month: 'short', year: 'numeric' };
+    return new Intl.DateTimeFormat(LOCALE[lang], Object.assign({ timeZone: 'UTC' }, o)).format(d);
+  };
+  const money = n => new Intl.NumberFormat(LOCALE[lang], { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
+
+  /* data */
+  const BETS = [
+    { w: '0x4be2…a91c', pos: 'yes', amt: 48200, price: 0.19, min: 130 },
+    { w: '0x91d7…3f20', pos: 'yes', amt: 27500, price: 0.21, min: 95 },
+    { w: '0xc03a…77be', pos: 'yes', amt: 6400,  price: 0.22, min: 300 },
+    { w: '0x2f68…d514', pos: 'no',  amt: 12000, price: 0.80, min: 1440 }
+  ];
+  const payout = b => b.amt / b.price;
+  const profit = (b, won) => won ? payout(b) - b.amt : -b.amt;
+  const MEETINGS = [
+    { d: '2026-10-28', n: 6,   rise: 12, hold: 86, cut: 2 },
+    { d: '2026-12-09', n: 48,  rise: 76, hold: 21, cut: 3 },
+    { d: '2027-01-27', n: 97,  rise: 42, hold: 53, cut: 5 },
+    { d: '2027-03-17', n: 146, rise: 62, hold: 31, cut: 7 }
+  ];
+  const INTENT = { dep: 'dep_text', tsy: 'tsy_text', loan: 'loan_text' };
+  let intent = 'dep';
+
+  function fmtBefore(min) {
+    if (min >= 1440) return t('before_d', { d: Math.round(min / 1440) });
+    return t('before', { h: Math.floor(min / 60), m: String(min % 60).padStart(2, '0') });
+  }
+
+  function render() {
+    document.documentElement.lang = LOCALE[lang];
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      let vars = null;
+      if (el.dataset.vars) {
+        vars = JSON.parse(el.dataset.vars);
+        Object.keys(vars).forEach(k => { if (String(vars[k]).startsWith('d:')) vars[k] = fmtDate(vars[k].slice(2)) });
+      }
+      el.textContent = t(el.dataset.i18n, vars);
+    });
+    document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = t(el.dataset.i18nHtml) });
+    document.querySelectorAll('time[data-d]').forEach(el => { el.textContent = fmtDate(el.dataset.d, el.dataset.f); el.setAttribute('datetime', el.dataset.d) });
+    document.getElementById('fresh-text').textContent = t('fresh', { ago: t('ago'), every: t('every'), days: t('days') });
+    syncRefresh();
+    document.querySelector('[data-toggle="more1"] span').textContent = t(document.getElementById('more1').hidden ? 'show_more' : 'hide_more');
+    renderIntent(); renderMeetings(); renderBets(); renderCharts();
+    document.getElementById('s-vol').textContent = money(1900000);
+    document.getElementById('s-big').textContent = money(48200);
+  }
+
+  function renderIntent() {
+    const p = MEETINGS[0].rise;
+    const key = p >= 60 ? 'sig_high' : p >= 40 ? 'sig_none' : p >= 5 ? 'sig_low' : p >= 1 ? 'sig_unusual' : 'sig_very';
+    document.getElementById('sig-name').textContent = t(key);
+    document.getElementById('sig-text').textContent = t(INTENT[intent]);
+    document.querySelectorAll('#seg-intent button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.int === intent)));
+  }
+
+  function renderMeetings() {
+    const tb = document.getElementById('meetings');
+    const open = new Set([...tb.querySelectorAll('tr[data-open="1"]')].map(r => r.dataset.d));
+    tb.innerHTML = '';
+    MEETINGS.forEach(m => {
+      const tr = document.createElement('tr');
+      tr.dataset.d = m.d;
+      tr.innerHTML = `<td>${fmtDate(m.d)}</td><td class="num">${t('days_word', { n: m.n })}</td>
+        <td><div class="row" style="gap:10px;flex-wrap:nowrap"><div class="bar thin" style="width:110px;flex:none"><i style="width:${m.rise}%"></i></div><span class="num">${m.rise}%</span></div></td>
+        <td class="r"><button class="collapse-btn" data-row="${m.d}">${t('hold_cut')}</button></td>`;
+      tb.append(tr);
+      const sub = document.createElement('tr');
+      sub.className = 'sub'; sub.dataset.sub = m.d; sub.hidden = !open.has(m.d);
+      sub.innerHTML = `<td colspan="4"><div class="row" style="gap:18px"><span>${t('w_hold')} <b class="num">${m.hold}%</b></span><span>${t('w_cut')} <b class="num">${m.cut}%</b></span><span class="muted">${t('w_rise')} <span class="num">${m.rise}%</span></span></div></td>`;
+      if (open.has(m.d)) tr.dataset.open = '1';
+      tb.append(sub);
+    });
+  }
+
+  function renderBets() {
+    const tb = document.getElementById('bets');
+    tb.innerHTML = '';
+    BETS.forEach(b => {
+      const won = b.pos === 'yes';
+      const p = profit(b, won);
+      const tr = document.createElement('tr');
+      if (b.min <= 180 && b.amt >= 25000) tr.className = 'flag';
+      tr.innerHTML = `<td class="mono">${b.w}</td><td>${t(b.pos === 'yes' ? 'p_yes' : 'p_no')}</td>
+        <td class="r num">${money(b.amt)}</td><td class="r num">${Math.round(b.price * 100)}¢</td><td>${fmtBefore(b.min)}</td>
+        <td class="r num ${won ? 'pos' : 'neg'}">${won ? '+' : '−'}${money(Math.abs(p))}</td>`;
+      tb.append(tr);
+    });
+    const to = document.getElementById('bets-open');
+    to.innerHTML = '';
+    BETS.slice(0, 3).forEach(b => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td class="mono">${b.w}</td><td>${t(b.pos === 'yes' ? 'p_yes' : 'p_no')}</td>
+        <td class="r num">${money(b.amt)}</td><td class="r num">${Math.round(b.price * 100)}¢</td><td>${fmtBefore(b.min)}</td>
+        <td class="r num">${money(payout(b))}</td>`;
+      to.append(tr);
+    });
+  }
+
+  /* charts: inline SVG, tokens only */
+  function renderCharts() {
+    // effective rate, step line (NY Fed values from the API check; label positions approximate)
+    const W = 420, H = 190, L = 34, R = 10, T = 14, B = 26;
+    const start = Date.UTC(2025, 9, 22), end = Date.UTC(2026, 9, 20), span = end - start;
+    const pts = [[Date.UTC(2025,9,22),4.11],[Date.UTC(2025,9,30),3.87],[Date.UTC(2025,11,11),3.64],[Date.UTC(2026,8,17),3.88],[end,3.88]];
+    const x = ms => L + (ms - start) / span * (W - L - R);
+    const y = v => T + (4.3 - v) / (4.3 - 3.5) * (H - T - B);
+    let d = `M${x(pts[0][0])},${y(pts[0][1])}`;
+    for (let i = 1; i < pts.length; i++) d += ` H${x(pts[i][0])} V${y(pts[i][1])}`;
+    let g = '';
+    [3.5, 3.75, 4.0, 4.25].forEach(v => { g += `<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" style="stroke:var(--border)"/><text x="${L-6}" y="${y(v)+3}" text-anchor="end">${v.toFixed(2)}</text>`; });
+    const months = [[2025,9],[2026,0],[2026,3],[2026,6],[2026,9]];
+    months.forEach(([yy,mm]) => { const ms = Date.UTC(yy,mm,1); if (ms >= start && ms <= end) g += `<text x="${x(ms)}" y="${H-8}" text-anchor="middle">${new Intl.DateTimeFormat(LOCALE[lang],{month:'short',timeZone:'UTC'}).format(new Date(ms))}</text>`; });
+    const dots = pts.slice(1,4).map(p => `<circle cx="${x(p[0])}" cy="${y(p[1])}" r="3.5" style="fill:var(--background);stroke:var(--primary);stroke-width:2"/>`).join('');
+    document.getElementById('chart-rate').innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${t('chart1_h')}">${g}<path d="${d}" style="fill:none;stroke:var(--primary);stroke-width:2"/>${dots}</svg>`;
+
+    // hike probability bars one month before each meeting
+    const bars = [['Jan',4],['Mar',2],['Apr',3],['Jun',5],['Jul',9],['Sep',7]];
+    const mnames = {en:['Jan','Mar','Apr','Jun','Jul','Sep'],ko:['1월','3월','4월','6월','7월','9월'],gb:['Jan','Mar','Apr','Jun','Jul','Sep']}[lang];
+    const bw = (W - L - R) / bars.length;
+    let b = '';
+    [0, 25, 50].forEach(v => { const yy = T + (50 - v) / 50 * (H - T - B); b += `<line x1="${L}" x2="${W-R}" y1="${yy}" y2="${yy}" style="stroke:var(--border)"/><text x="${L-6}" y="${yy+3}" text-anchor="end">${v}%</text>`; });
+    bars.forEach(([_, v], i) => {
+      const h = v / 50 * (H - T - B), bx = L + i * bw + bw * 0.22, yy = H - B - h;
+      const sur = i === bars.length - 1;
+      b += `<rect x="${bx}" y="${yy}" width="${bw*0.56}" height="${h}" rx="3" style="fill:${sur ? 'var(--destructive)' : 'var(--chart-2)'}"/><text x="${bx+bw*0.28}" y="${yy-4}" text-anchor="middle">${v}%</text><text x="${bx+bw*0.28}" y="${H-8}" text-anchor="middle">${mnames[i]}</text>`;
+    });
+    document.getElementById('chart-prob').innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${t('chart2_h')}">${b}</svg>`;
+
+    // event timeline: 12 hours in 10-minute steps, spike at announcement
+    const N = 73, pr = [];
+    for (let i = 0; i < N; i++) {
+      let base = 0.2 + 0.012 * Math.sin(i / 5) + 0.008 * Math.sin(i / 1.7);
+      BETS.filter(bb => bb.pos === 'yes').forEach(bb => { if (i >= N - 1 - Math.round(bb.min / 10)) base += Math.min(0.03, bb.amt / 1.6e6) });
+      pr.push(i < N - 1 ? base : 1);
+    }
+    const tx = i => L + i / (N - 1) * (W - L - R), ty = v => T + (1 - v) / 1 * (H - T - B);
+    let tl = '';
+    [0, 0.5, 1].forEach(v => { tl += `<line x1="${L}" x2="${W-R}" y1="${ty(v)}" y2="${ty(v)}" style="stroke:var(--border)"/><text x="${L-6}" y="${ty(v)+3}" text-anchor="end">${Math.round(v*100)}%</text>`; });
+    let path = ''; pr.forEach((v, i) => { path += (i ? 'L' : 'M') + tx(i).toFixed(1) + ',' + ty(v).toFixed(1) });
+    const markers = BETS.filter(bb => bb.pos === 'yes' && bb.min <= 720).map(bb => { const i = N - 1 - Math.round(bb.min / 10); return `<circle cx="${tx(i)}" cy="${ty(pr[i])}" r="${3 + Math.min(5, bb.amt / 10000)}" style="fill:var(--destructive);fill-opacity:.85"/>`; }).join('');
+    tl += `<line x1="${tx(N-1)}" x2="${tx(N-1)}" y1="${T}" y2="${H-B}" style="stroke:var(--foreground);stroke-width:1.5"/><path d="${path}" style="fill:none;stroke:var(--primary);stroke-width:2"/>`;
+    tl += `<g id="bet-markers">${markers}</g>`;
+    for (let k = 0; k <= 6; k += 1) tl += `<text x="${tx(k * 12)}" y="${H-8}" text-anchor="${k===6?'end':k===0?'start':'middle'}">${k===6?'0':'−'+(12-k*2)+'h'}</text>`;
+    document.getElementById('chart-tl').innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${t('tl_h')}">${tl}</svg>`;
+    applyMarkerState();
+  }
+  function applyMarkerState() {
+    const m = document.getElementById('bet-markers');
+    if (m) m.style.display = (window.prototypeShell && prototypeShell.getState() === 'Wallet data unavailable') ? 'none' : '';
+  }
+
+  /* language */
+  document.getElementById('lang').onchange = e => { lang = e.target.value; render(); };
+
+  /* nav highlight follows the visible screen */
+  function syncNav() {
+    const s = window.prototypeShell && prototypeShell.getScreen();
+    document.querySelectorAll('[data-nav]').forEach(a => {
+      const on = a.dataset.nav === s || (s === 'event' && a.dataset.nav === 'home');
+      if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+  }
+  new MutationObserver(syncNav).observe(document.querySelector('.stage-inner'), { attributes: true, attributeFilter: ['hidden'], subtree: true });
+
+  /* refresh: 30 s between refreshes; 3 refreshes within 5 min lock it for 1 hour */
+  let refreshing = false, lastRefresh = 0, lockedUntil = 0, stamps = [], tick = null;
+  const btn = document.getElementById('refresh');
+  const blocked = () => refreshing || Date.now() < lockedUntil || Date.now() - lastRefresh < 30000;
+  function syncRefresh() {
+    const now = Date.now();
+    let label = t('refresh_btn');
+    if (refreshing) label = t('refreshing_btn');
+    else if (now < lockedUntil) label = t('refresh_locked', { m: Math.ceil((lockedUntil - now) / 60000) });
+    else if (now - lastRefresh < 30000) label = t('refresh_wait', { s: Math.ceil((30000 - (now - lastRefresh)) / 1000) });
+    btn.disabled = blocked();
+    document.getElementById('refresh-label').textContent = label;
+    document.getElementById('refresh-icon').hidden = !refreshing;
+    document.getElementById('refresh-note').hidden = !(now < lockedUntil);
+    if (!blocked() && tick) { clearInterval(tick); tick = null; }
+  }
+  btn.onclick = () => {
+    if (blocked()) return;
+    refreshing = true; syncRefresh();
+    const onHome = prototypeShell.getScreen() === 'home' && prototypeShell.getState() === 'Default';
+    if (onHome) prototypeShell.setState('Refreshing');
+    setTimeout(() => {
+      refreshing = false; lastRefresh = Date.now();
+      stamps = stamps.filter(x => lastRefresh - x < 300000); stamps.push(lastRefresh);
+      if (stamps.length >= 3) { lockedUntil = lastRefresh + 3600000; stamps = []; }
+      DICT.en.ago = DICT.gb.ago = 'just now'; DICT.ko.ago = '방금';
+      document.getElementById('fresh-text').textContent = t('fresh', { ago: t('ago'), every: t('every'), days: t('days') });
+      if (onHome && prototypeShell.getState() === 'Refreshing') prototypeShell.setState('Default');
+      if (!tick) tick = setInterval(syncRefresh, 1000);
+      syncRefresh();
+    }, 1100);
+  };
+
+  /* segmented controls and collapsibles (one-click interactions) */
+  document.getElementById('seg-home').addEventListener('click', e => {
+    const b = e.target.closest('[data-seg]'); if (!b) return;
+    document.querySelectorAll('#seg-home button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
+    const up = b.dataset.seg === 'up';
+    document.getElementById('list-up').hidden = !up || !['Default', 'Source unavailable'].includes(prototypeShell.getState());
+    document.getElementById('list-res').hidden = up;
+  });
+  document.getElementById('seg-intent').addEventListener('click', e => {
+    const b = e.target.closest('[data-int]'); if (!b) return;
+    intent = b.dataset.int; renderIntent();
+  });
+  document.addEventListener('click', e => {
+    const tg = e.target.closest('[data-toggle]');
+    if (tg) {
+      const body = document.getElementById(tg.dataset.toggle);
+      body.hidden = !body.hidden;
+      if (tg.dataset.toggle === 'more1') tg.querySelector('span').textContent = t(body.hidden ? 'show_more' : 'hide_more');
+    }
+    const rw = e.target.closest('[data-row]');
+    if (rw) {
+      const d = rw.dataset.row;
+      const sub = document.querySelector(`tr[data-sub="${d}"]`), main = document.querySelector(`tr[data-d="${d}"]`);
+      sub.hidden = !sub.hidden; main.dataset.open = sub.hidden ? '' : '1';
+    }
+  });
+  document.addEventListener('statechange', () => {
+    /* keep Upcoming/Resolved tab consistent when presets swap the list */
+    const resSel = document.querySelector('#seg-home [data-seg="res"]').getAttribute('aria-selected') === 'true';
+    if (resSel) document.getElementById('list-up').hidden = true;
+    applyMarkerState();
+  });
+
+  render(); syncNav();
+</script>

@@ -8,6 +8,17 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
+<!-- BEGIN:vendor-live-docs -->
+
+# 호스팅 서비스 최신 문서
+
+Vercel 배포나 Supabase 데이터베이스 작업을 시작할 때, 아래 공식 `llms.txt`를 먼저 가져와 필요한 페이지를 찾는다. 내용은 저장소에 복사하지 않고 작업 시점에 읽으며, 설치된 CLI·패키지 버전과 맞는지 확인한 뒤 따른다.
+
+- Vercel: https://vercel.com/llms.txt
+- Supabase: https://supabase.com/llms.txt
+
+<!-- END:vendor-live-docs -->
+
 # 아키텍처 핵심 원칙
 
 모든 구조 판단은 아래 5가지를 기준으로 한다.
