@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { DisclosureArrow } from "@/components/shell/disclosure-arrow";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useI18n } from "@/features/i18n/provider";
@@ -40,8 +41,9 @@ export function GuidanceTabs({ items }: { items: GuidanceItem[] }) {
         </TabsContent>
       ))}
       <Collapsible open={calcOpen} onOpenChange={setCalcOpen}>
-        <CollapsibleTrigger className="text-sm underline underline-offset-4">
+        <CollapsibleTrigger className="inline-flex items-center gap-1.5 text-sm underline underline-offset-4">
           {t("calc_btn")}
+          <DisclosureArrow open={calcOpen} />
         </CollapsibleTrigger>
         <CollapsibleContent className="mt-2 text-sm text-muted-foreground" data-testid="calc-text">
           {t("calc_text")}

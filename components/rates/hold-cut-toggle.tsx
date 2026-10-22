@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { DisclosureArrow } from "@/components/shell/disclosure-arrow";
 import { Progress } from "@/components/ui/progress";
 import { useI18n } from "@/features/i18n/provider";
 
@@ -13,8 +14,9 @@ export function HoldCutToggle({ hold, cut }: { hold: number; cut: number }) {
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="text-sm underline underline-offset-4">
+      <CollapsibleTrigger className="inline-flex items-center gap-1.5 text-sm underline underline-offset-4">
         {t(open ? "hide_more" : "show_more")}
+        <DisclosureArrow open={open} />
       </CollapsibleTrigger>
       <CollapsibleContent className="mt-3 grid gap-2" data-testid="hold-cut">
         {[

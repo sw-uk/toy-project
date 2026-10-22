@@ -2,6 +2,7 @@
 
 import { Fragment, useState } from "react";
 
+import { DisclosureArrow } from "@/components/shell/disclosure-arrow";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useI18n } from "@/features/i18n/provider";
@@ -51,11 +52,12 @@ export function MeetingsTable({ rows }: { rows: MeetingRow[] }) {
                 <TableCell className="text-right">
                   <button
                     type="button"
-                    className="text-sm underline underline-offset-4"
+                    className="inline-flex items-center gap-1.5 text-sm underline underline-offset-4"
                     aria-expanded={open.has(row.date)}
                     onClick={() => toggle(row.date)}
                   >
                     {t("hold_cut")}
+                    <DisclosureArrow open={open.has(row.date)} />
                   </button>
                 </TableCell>
               </TableRow>
